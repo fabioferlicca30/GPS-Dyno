@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"/>
+<meta name="theme-color" content="#0a0a0a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="GPS Dyno"/>
+<title>GPS Dyno</title>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;600&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --red:#ff2020;--orange:#ff6b00;--yellow:#ffd000;
+  --green:#00ff88;--cyan:#00e5ff;
+  --bg:#0a0a0a;--bg2:#111;--bg3:#1a1a1a;
+  --border:#2a2a2a;--text:#e8e8e8;--muted:#555;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+
+/* ── NO SCROLL: entire app fits the screen ── */
+html,body{
+  height:100%;overflow:hidden;
+  background:var(--bg);color:var(--text);
+  font-family:'JetBrains Mono',monospace;
+}
+
+/* ── DISCLAIMER ── */
+#disc{
+  position:fixed;inset:0;z-index:999;background:#0a0a0a;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:20px;overflow-y:auto;-webkit-overflow-scrolling:touch;
+}
+.disc-logo{
+  font-family:'Orbitron',sans-serif;font-weight:900;font-size:26px;
+  letter-spacing:4px;color:var(--red);text-shadow:0 0 24px rgba(255,32,32,.5);
+  margin-bottom:18px;
+}
+.disc-logo span{color:var(--text)}
+.disc-box{
+  background:var(--bg3);border:1px solid var(--border);border-radius:10px;
+  padding:16px;max-width:480px;width:100%;margin-bottom:16px;
+}
+.disc-row{display:flex;gap:10px;margin-bottom:12px;align-items:flex-start}
+.disc-row:last-child{margin-bottom:0}
+.disc-ico{font-size:18px;flex-shrink:0;margin-top:1px}
+.disc-txt{font-size:11px;color:#ccc;line-height:1.7}
+.disc-txt b{color:var(--yellow)}
+.disc-chk{
+  display:flex;gap:12px;align-items:flex-start;
+  background:rgba(255,32,32,.06);border:1px solid rgba(255,32,32,.2);border-radius:8px;
+  padding:14px;max-width:480px;width:100%;margin-bottom:16px;cursor:pointer;
+}
+.disc-chk input{width:20px;height:20px;flex-shrink:0;accent-color:var(--red);cursor:pointer;margin-top:1px}
+.disc-chk-txt{font-size:11px;color:#ddd;line-height:1.7}
+.disc-chk-txt b{color:var(--red)}
+.btn-disc{
+  width:100%;max-width:480px;padding:16px;
+  font-family:'Orbitron',sans-serif;font-size:13px;font-weight:700;letter-spacing:3px;
+  border:none;border-radius:8px;cursor:pointer;text-transform:uppercase;
+  background:#222;color:#444;transition:all .3s;margin-bottom:12px;
+}
+.btn-disc.ready{
+  background:linear-gradient(135deg,#ff2020,#ff6b00);color:#fff;
+  box-shadow:0 4px 20px rgba(255,32,32,.4);
+}
+.disc-legal{font-size:9px;color:#333;text-align:center;line-height:1.6;max-width:480px;padding-bottom:env(safe-area-inset-bottom,12px)}
+
+/* ── APP SHELL: fixed height, no overflow ── */
+#app{
+  display:none;flex-direction:column;
+  height:100%;height:100dvh;overflow:hidden;
+}
+
+/* ── HEADER ── */
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 16px;border-bottom:1px solid var(--border);
+  background:linear-gradient(180deg,#111,#0a0a0a);flex-shrink:0;
+}
+.logo{font-family:'Orbitron',sans-serif;font-weight:900;font-size:19px;letter-spacing:3px;color:var(--red)}
+.logo span{color:var(--text)}
+.hdr-r{display:flex;align-items:center;gap:10px}
+.gps-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);transition:.3s}
+.gps-dot.ok{background:var(--green);box-shadow:0 0 7px var(--green)}
+.gps-dot.rec{background:var(--yellow);box-shadow:0 0 7px var(--yellow);animation:blink .5s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.gps-lbl{font-size:10px;color:var(--muted);letter-spacing:1px}
+
+/* ── NAV ── */
+nav{display:flex;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0}
+nav button{
+  flex:1;padding:10px 2px;background:none;border:none;color:var(--muted);
+  font-family:'Orbitron',sans-serif;font-size:8.5px;letter-spacing:1px;
+  cursor:pointer;border-bottom:2px solid transparent;transition:.2s;text-transform:uppercase;
+}
+nav button.on{color:var(--red);border-bottom-color:var(--red)}
+
+/* ── PAGES: fill remaining height, no scroll ── */
+.pages{flex:1;overflow:hidden;position:relative}
+.page{
+  position:absolute;inset:0;
+  display:none;flex-direction:column;
+  overflow:hidden;padding:14px;gap:10px;
+}
+.page.on{display:flex}
+
+/* ── GAUGES ── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px;flex-shrink:0}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;flex-shrink:0}
+.g4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;flex-shrink:0}
+.gcard{
+  background:var(--bg3);border:1px solid var(--border);border-radius:7px;
+  padding:10px 8px;position:relative;overflow:hidden;
+}
+.gcard::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:var(--ac,var(--red));box-shadow:0 0 6px var(--ac,var(--red));
+}
+.glbl{font-size:8px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px}
+.gval{font-family:'Orbitron',sans-serif;font-size:22px;font-weight:700;line-height:1;color:var(--ac,var(--red))}
+.gunit{font-size:9px;color:var(--muted);margin-top:2px;letter-spacing:.5px}
+.gc{--ac:var(--cyan)}.go{--ac:var(--orange)}.gr{--ac:var(--red)}.gy{--ac:var(--yellow)}.gg{--ac:var(--green)}.gm{--ac:#cc77ff}
+
+/* slope sign */
+.slope-sign{font-size:10px;color:var(--muted)}
+
+/* ── SPEED BAR ── */
+.sbar{background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:10px;flex-shrink:0}
+.sbar-hdr{display:flex;justify-content:space-between;font-size:9px;color:var(--muted);margin-bottom:6px}
+.sbar-track{height:6px;background:#1a1a1a;border-radius:3px;overflow:hidden}
+.sbar-fill{height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,var(--cyan),var(--red));transition:width .25s}
+
+/* ── GEAR PANEL ── */
+.gear-panel{background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:10px;flex-shrink:0}
+.gear-ttl{font-size:8px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
+.gear-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.gbtn{
+  padding:7px 13px;background:#111;border:1px solid var(--border);
+  border-radius:5px;color:var(--muted);font-family:'Orbitron',sans-serif;
+  font-size:12px;cursor:pointer;transition:.15s;min-width:40px;text-align:center;
+}
+.gbtn:active{transform:scale(.93)}
+.gbtn.sel{background:rgba(255,32,32,.15);border-color:var(--red);color:var(--red)}
+.gbtn.unk{border-color:var(--cyan);color:var(--cyan);background:rgba(0,229,255,.06)}
+
+/* ── REC INDICATOR ── */
+.rec-ind{
+  display:none;align-items:center;gap:8px;
+  background:rgba(255,32,32,.1);border:1px solid rgba(255,32,32,.3);
+  border-radius:5px;padding:8px 12px;font-size:10px;color:var(--red);
+  flex-shrink:0;
+}
+.rec-ind.on{display:flex}
+.rec-dot{width:7px;height:7px;border-radius:50%;background:var(--red);animation:blink 1s infinite}
+
+/* ── INFO BOX ── */
+.ibox{
+  background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.12);
+  border-radius:7px;padding:10px 12px;font-size:10px;color:#999;line-height:1.8;
+  flex-shrink:0;
+}
+.ibox b{color:var(--cyan)}
+
+/* ── CONTROLS ── */
+.btn-main{
+  width:100%;padding:14px;font-family:'Orbitron',sans-serif;font-size:13px;
+  font-weight:700;letter-spacing:3px;border:none;border-radius:7px;
+  cursor:pointer;text-transform:uppercase;transition:.2s;flex-shrink:0;
+}
+.btn-main.start{background:linear-gradient(135deg,#ff2020,#ff6b00);color:#fff;box-shadow:0 3px 16px rgba(255,32,32,.4)}
+.btn-main.stop{background:#1a1a1a;color:var(--red);border:1px solid var(--red)}
+.btn-main:active{transform:scale(.97)}
+.btn-sec{
+  padding:10px;font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1.5px;
+  background:var(--bg3);color:var(--muted);border:1px solid var(--border);
+  border-radius:7px;cursor:pointer;text-transform:uppercase;flex-shrink:0;
+}
+
+/* ── CHART PAGE ── */
+.chart-hdr{display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0}
+.chart-ttl{font-family:'Orbitron',sans-serif;font-size:12px;letter-spacing:2px}
+.chart-sub{font-size:9px;color:var(--muted);margin-top:3px;letter-spacing:.5px}
+.badges{display:flex;flex-direction:column;gap:3px;align-items:flex-end}
+.badge{padding:2px 8px;border-radius:20px;font-size:9px;font-weight:600;letter-spacing:.5px}
+.bp{background:rgba(255,32,32,.15);color:var(--red);border:1px solid var(--red)}
+.bt{background:rgba(255,208,0,.15);color:var(--yellow);border:1px solid var(--yellow)}
+.chart-wrap{flex:1;min-height:0;position:relative}
+canvas#dynoChart{width:100%;height:100%;display:block;border-radius:7px;background:var(--bg3);border:1px solid var(--border)}
+.chart-legend{display:flex;gap:16px;font-size:9px;color:var(--muted);flex-shrink:0}
+
+/* ── RUNS ── */
+.run-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+.run-item{
+  background:var(--bg3);border:1px solid var(--border);border-radius:6px;
+  padding:10px 12px;display:flex;justify-content:space-between;align-items:center;
+  cursor:pointer;flex-shrink:0;
+}
+.run-item:active{border-color:var(--red)}
+.run-date{font-size:9px;color:var(--muted);margin-top:2px}
+.run-peak{font-family:'Orbitron',sans-serif;font-size:12px;color:var(--red)}
+
+/* ── CARS ── */
+.sec-ttl{font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;flex-shrink:0}
+.car-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;min-height:0}
+.car-item{
+  background:var(--bg3);border:1px solid var(--border);border-radius:7px;
+  padding:11px 13px;display:flex;align-items:center;justify-content:space-between;
+  cursor:pointer;transition:.15s;flex-shrink:0;
+}
+.car-item.sel{border-color:var(--red)}
+.car-item.sel .cname{color:var(--red)}
+.cname{font-size:12px;font-weight:600}
+.cdet{font-size:9px;color:var(--muted);margin-top:2px}
+.cmass{font-family:'Orbitron',sans-serif;font-size:13px;color:var(--cyan)}
+.cmass-u{font-size:8px;color:var(--muted)}
+.car-actions{display:flex;gap:6px;margin-top:0}
+.btn-edit{padding:4px 10px;font-size:9px;background:rgba(0,229,255,.1);border:1px solid var(--cyan);color:var(--cyan);border-radius:4px;cursor:pointer;font-family:'Orbitron',sans-serif;letter-spacing:1px}
+.btn-del{padding:4px 10px;font-size:9px;background:rgba(255,32,32,.1);border:1px solid rgba(255,32,32,.4);color:var(--red);border-radius:4px;cursor:pointer;font-family:'Orbitron',sans-serif;letter-spacing:1px}
+
+/* ── CAR FORM (in modal) ── */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:200;align-items:flex-end;justify-content:center}
+.overlay.open{display:flex}
+.modal{
+  background:var(--bg2);border:1px solid var(--border);
+  border-top-left-radius:14px;border-top-right-radius:14px;
+  padding:20px 16px 32px;width:100%;max-width:500px;
+  max-height:90dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+}
+.modal-ttl{font-family:'Orbitron',sans-serif;font-size:13px;letter-spacing:2px;color:var(--cyan);margin-bottom:14px}
+.fr{display:flex;flex-direction:column;gap:3px;margin-bottom:9px}
+.fr2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px}
+.fr3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:9px}
+label{font-size:8px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px;display:block}
+input,select{
+  width:100%;background:#0c0c0c;border:1px solid var(--border);border-radius:5px;
+  padding:9px 10px;color:var(--text);font-family:'JetBrains Mono',monospace;
+  font-size:12px;outline:none;-webkit-appearance:none;
+}
+input:focus,select:focus{border-color:var(--cyan)}
+.ratios-wrap{background:#0c0c0c;border:1px solid var(--border);border-radius:5px;padding:10px;margin-bottom:10px}
+.ratios-ttl{font-size:8px;color:var(--cyan);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px}
+.ratios-hint{font-size:9px;color:var(--muted);margin-bottom:8px;line-height:1.5}
+.grrow{display:grid;grid-template-columns:52px 1fr;gap:6px;align-items:center;margin-bottom:6px}
+.grlbl{font-size:9px;color:var(--muted);letter-spacing:.5px}
+.btn-save{width:100%;padding:13px;background:rgba(0,229,255,.12);border:1px solid var(--cyan);color:var(--cyan);border-radius:7px;font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:2px;cursor:pointer;text-transform:uppercase;margin-top:4px}
+.btn-cancel-modal{width:100%;padding:10px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1.5px;cursor:pointer;text-transform:uppercase;margin-top:6px}
+
+/* gear modal */
+.mg-list{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.mg-item{
+  background:var(--bg3);border:1px solid var(--border);border-radius:7px;
+  padding:12px 14px;display:flex;justify-content:space-between;align-items:center;
+  cursor:pointer;transition:.15s;
+}
+.mg-item:active,.mg-item.sel{border-color:var(--red)}
+.mg-num{font-family:'Orbitron',sans-serif;font-size:20px;color:var(--red)}
+.mg-rv{font-size:12px;color:var(--text)}
+.mg-info{font-size:9px;color:var(--muted);text-align:right}
+.sep{border:none;border-top:1px solid var(--border);margin:12px 0}
+
+/* wizard */
+.wiz-box{background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.2);border-radius:7px;padding:12px;margin-bottom:12px}
+.wiz-ttl{font-size:8px;color:var(--cyan);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
+.wiz-body{font-size:10px;color:#aaa;line-height:1.6;margin-bottom:10px}
+.btn-wiz{width:100%;padding:10px;background:rgba(0,229,255,.12);border:1px solid var(--cyan);color:var(--cyan);border-radius:5px;font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:1.5px;cursor:pointer;text-transform:uppercase;margin-top:6px}
+.wiz-result{display:none;background:rgba(0,255,136,.05);border:1px solid rgba(0,255,136,.2);border-radius:7px;padding:12px;margin-bottom:12px;font-size:10px;color:#aaa;line-height:1.7}
+
+/* no-data */
+.no-data{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;color:var(--muted)}
+.no-data-ico{font-size:40px;opacity:.3;margin-bottom:10px}
+.no-data p{font-size:10px;letter-spacing:.5px;line-height:1.8;text-align:center}
+
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* ══ LANDSCAPE ══ */
+@media (orientation:landscape){
+  #app{flex-direction:row}
+  #sidebar{display:flex!important;flex-direction:column;width:68px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border)}
+  #sidebar .s-logo{font-family:'Orbitron',sans-serif;font-weight:900;font-size:10px;color:var(--red);letter-spacing:1px;padding:8px 0;text-align:center;border-bottom:1px solid var(--border);writing-mode:horizontal-tb}
+  #sidebar .s-nav{display:flex;flex-direction:column;flex:1}
+  #sidebar .s-nav button{width:100%;padding:12px 2px;background:none;border:none;color:var(--muted);font-family:'Orbitron',sans-serif;font-size:7px;letter-spacing:.5px;cursor:pointer;border-left:2px solid transparent;transition:.2s;text-transform:uppercase}
+  #sidebar .s-nav button.on{color:var(--red);border-left-color:var(--red)}
+  #sidebar .s-gps{padding:8px 4px;text-align:center;border-top:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:3px}
+  header{display:none}
+  nav{display:none}
+  #main-content{flex:1;overflow:hidden;display:flex;flex-direction:column;min-width:0}
+  .pages{flex:1}
+  /* measure page 2-col */
+  #page-measure{flex-direction:row;padding:8px;gap:8px}
+  #measure-left{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
+  #measure-right{display:flex;flex-direction:column;gap:6px;width:190px;flex-shrink:0}
+  .g4-land{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:6px;flex:1;min-height:0}
+  .g2-land{display:grid;grid-template-columns:1fr 1fr;gap:6px;flex-shrink:0}
+  .gval{font-size:clamp(16px,3.2vw,30px)}
+  .btn-main{font-size:10px;padding:0;flex:1;min-height:44px}
+  .ibox{font-size:9px;line-height:1.5;padding:7px 9px}
+  .gear-panel{padding:7px}
+  .gbtn{padding:9px 7px;font-size:13px;min-width:38px}
+  .rec-ind{padding:5px 8px;font-size:9px}
+  /* chart */
+  #page-chart{padding:8px;gap:6px}
+  /* runs/cars */
+  #page-runs,#page-cars{padding:8px;gap:6px}
+  /* disclaimer landscape */
+  #disc{flex-direction:row;flex-wrap:wrap;justify-content:center;align-content:center;gap:12px;padding:12px}
+  .disc-box{max-width:320px;margin-bottom:0}
+  .disc-chk,.btn-disc{max-width:260px}
+}
+@media (orientation:portrait){
+  #sidebar{display:none}
+  #main-content{display:contents}
+  .g4-land,.g2-land{display:contents}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ DISCLAIMER ═══ -->
+<div id="disc">
+  <div class="disc-logo">GPS<span>DYNO</span></div>
+  <div class="disc-box">
+    <div class="disc-row"><span class="disc-ico">🚗</span><div class="disc-txt">Usa l'app <b>come passeggero</b> o con il dispositivo fisso su supporto — mai in mano durante la guida.</div></div>
+    <div class="disc-row"><span class="disc-ico">📍</span><div class="disc-txt">Misurazioni <b>solo su strade private o circuiti</b>, in piena sicurezza.</div></div>
+    <div class="disc-row"><span class="disc-ico">⚖️</span><div class="disc-txt"><b>Rispetta il codice della strada.</b> Ogni infrazione è responsabilità del conducente.</div></div>
+    <div class="disc-row"><span class="disc-ico">📊</span><div class="disc-txt">I valori sono <b>stime fisiche</b> — possono differire da un banco a rulli.</div></div>
+  </div>
+  <label class="disc-chk">
+    <input type="checkbox" id="agreeChk" onchange="onChk()"/>
+    <div class="disc-chk-txt">Ho letto e accetto. Userò GPS Dyno <b>in modo responsabile</b>.</div>
+  </label>
+  <button class="btn-disc" id="enterBtn" disabled onclick="enterApp()">ENTRA NELL'APP</button>
+  <div class="disc-legal">GPS Dyno non è responsabile per danni derivanti dall'uso improprio.</div>
+</div>
+
+<!-- ═══ APP ═══ -->
+<div id="app">
+
+  <!-- SIDEBAR (landscape) -->
+  <div id="sidebar" style="display:none">
+    <div class="s-logo">GPS<br/>DYNO</div>
+    <div class="s-nav">
+      <button class="on" id="snav-measure" onclick="showPage('measure',this)">⚡<br/>MISURA</button>
+      <button id="snav-chart" onclick="showPage('chart',this)">📈<br/>CURVA</button>
+      <button id="snav-runs" onclick="showPage('runs',this)">🏁<br/>RUNS</button>
+      <button id="snav-cars" onclick="showPage('cars',this)">🚗<br/>AUTO</button>
+    </div>
+    <div class="s-gps">
+      <div class="gps-dot" id="gpsDotS"></div>
+      <span style="font-size:7px;color:var(--muted)" id="gpsLblS">GPS</span>
+    </div>
+  </div>
+
+  <!-- PORTRAIT header -->
+  <header>
+    <div class="logo">GPS<span>DYNO</span></div>
+    <div class="hdr-r">
+      <div class="gps-dot" id="gpsDot"></div>
+      <span class="gps-lbl" id="gpsLbl">NO GPS</span>
+    </div>
+  </header>
+
+  <!-- PORTRAIT nav -->
+  <nav>
+    <button class="on" onclick="showPage('measure',this)">⚡ MISURA</button>
+    <button onclick="showPage('chart',this)">📈 CURVA</button>
+    <button onclick="showPage('runs',this)">🏁 RUNS</button>
+    <button onclick="showPage('cars',this)">🚗 AUTO</button>
+  </nav>
+
+  <div id="main-content">
+  <div class="pages">
+
+    <!-- MEASURE -->
+    <div class="page on" id="page-measure">
+      <!-- REC indicator always on top -->
+      <div class="rec-ind" id="recInd"><div class="rec-dot"></div>REC — <span id="recTime">0.0s</span></div>
+
+      <!-- LEFT column (portrait: full width; landscape: flex:1) -->
+      <div id="measure-left">
+        <!-- 4 gauges: portrait=grid-4, landscape=2×2 via g4-land -->
+        <div class="g4 g4-land">
+          <div class="gcard gc"><div class="glbl">VELOCITÀ</div><div class="gval" id="gSpeed">0</div><div class="gunit">km/h</div></div>
+          <div class="gcard go"><div class="glbl">ACCEL.</div><div class="gval" id="gAccel">0.00</div><div class="gunit">m/s²</div></div>
+          <div class="gcard gr"><div class="glbl">POTENZA</div><div class="gval" id="gPower">—</div><div class="gunit">CV</div></div>
+          <div class="gcard gy"><div class="glbl">COPPIA</div><div class="gval" id="gTorque">—</div><div class="gunit">Nm</div></div>
+        </div>
+        <!-- 2 gauges: RPM + slope -->
+        <div class="g2 g2-land">
+          <div class="gcard gg"><div class="glbl">RPM STIM.</div><div class="gval" id="gRpm">—</div><div class="gunit">giri/min</div></div>
+          <div class="gcard gm"><div class="glbl">PENDENZA</div><div class="gval" id="gSlope">0.0</div><div class="gunit">%</div></div>
+        </div>
+        <!-- Speed bar -->
+        <div class="sbar">
+          <div class="sbar-hdr"><span>0</span><span id="sbarVal">0 km/h</span><span>250</span></div>
+          <div class="sbar-track"><div class="sbar-fill" id="sBar"></div></div>
+        </div>
+      </div>
+
+      <!-- RIGHT column (portrait: full width; landscape: 190px fixed) -->
+      <div id="measure-right">
+        <!-- Gear panel -->
+        <div class="gear-panel" style="flex-shrink:0">
+          <div class="gear-ttl">MARCIA</div>
+          <div class="gear-row" id="gearRow"><span style="font-size:10px;color:var(--muted)">Seleziona un'auto →</span></div>
+        </div>
+        <!-- Start/stop button -->
+        <button class="btn-main start" id="mainBtn" onclick="toggleMeasure()">▶ AVVIA MISURA</button>
+        <!-- Info -->
+        <div class="ibox">
+          <b>AUTO:</b> <span id="infocar">Nessuna</span><br/>
+          <b>MARCIA:</b> <span id="infogear">—</span><br/>
+          <b>RAPPORTO:</b> <span id="inforatio">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHART -->
+    <div class="page" id="page-chart">
+      <div class="chart-hdr">
+        <div>
+          <div class="chart-ttl">CURVA DI POTENZA</div>
+          <div class="chart-sub" id="chartSub">—</div>
+        </div>
+        <div class="badges">
+          <div class="badge bp" id="badgePwr">— CV</div>
+          <div class="badge bt" id="badgeTrq">— Nm</div>
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="dynoChart"></canvas>
+      </div>
+      <div class="chart-legend">
+        <span><span style="color:var(--red)">●</span> POTENZA (CV)</span>
+        <span><span style="color:var(--yellow)">●</span> COPPIA MOTORE (Nm)</span>
+        <span style="font-size:8px;color:#333">asse X = RPM (se disponibile) o km/h</span>
+      </div>
+    </div>
+
+    <!-- RUNS -->
+    <div class="page" id="page-runs">
+      <div class="sec-ttl">SESSIONI SALVATE</div>
+      <div class="run-list" id="runList">
+        <div class="no-data"><div class="no-data-ico">🏁</div><p>Nessuna sessione ancora.</p></div>
+      </div>
+    </div>
+
+    <!-- CARS -->
+    <div class="page" id="page-cars">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+        <div class="sec-ttl">DATABASE AUTO</div>
+        <button class="btn-edit" onclick="openCarForm(null)" style="font-size:9px">+ AGGIUNGI</button>
+      </div>
+      <div class="car-list" id="carList">
+        <div class="no-data"><div class="no-data-ico">🚗</div><p>Nessuna auto.</p></div>
+      </div>
+    </div>
+
+  </div><!-- /pages -->
+  </div><!-- /main-content -->
+</div><!-- /app -->
+
+<!-- ═══ GEAR MODAL ═══ -->
+<div class="overlay" id="gearOvl">
+  <div class="modal">
+    <div class="modal-ttl">SELEZIONA MARCIA</div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:14px" id="gearModalSub"></div>
+    <div class="mg-list" id="gearList"></div>
+    <hr class="sep"/>
+    <button class="btn-cancel-modal" onclick="closeGearModal()">ANNULLA</button>
+  </div>
+</div>
+
+<!-- ═══ WIZARD MODAL ═══ -->
+<div class="overlay" id="wizOvl">
+  <div class="modal">
+    <div class="modal-ttl">🔍 CALCOLO RAPPORTO</div>
+    <div class="wiz-box">
+      <div class="wiz-ttl">RPM a velocità costante</div>
+      <div class="wiz-body">Guida in piano a velocità costante nella marcia desiderata. Annota gli RPM del contagiri e inseriscili qui.</div>
+      <div class="fr2">
+        <div class="fr"><label>Velocità (km/h)</label><input type="number" id="wSpeed" value="60"/></div>
+        <div class="fr"><label>RPM contagiri</label><input type="number" id="wRpm" placeholder="2000"/></div>
+      </div>
+      <div class="fr"><label>Numero marcia</label>
+        <select id="wGear"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option><option>7</option></select>
+      </div>
+      <button class="btn-wiz" onclick="calcWiz()">CALCOLA</button>
+    </div>
+    <div class="wiz-result" id="wizRes"></div>
+    <hr class="sep"/>
+    <button class="btn-cancel-modal" onclick="closeWizModal()">ANNULLA</button>
+  </div>
+</div>
+
+<!-- ═══ CAR FORM MODAL ═══ -->
+<div class="overlay" id="carFormOvl">
+  <div class="modal">
+    <div class="modal-ttl" id="carFormTtl">+ AGGIUNGI AUTO</div>
+    <div class="fr2">
+      <div class="fr"><label>Marca</label><input id="cMake" placeholder="BMW"/></div>
+      <div class="fr"><label>Modello</label><input id="cModel" placeholder="M3"/></div>
+    </div>
+    <div class="fr3">
+      <div class="fr"><label>Anno</label><input type="number" id="cYear" placeholder="2023"/></div>
+      <div class="fr"><label>Massa (kg)</label><input type="number" id="cMass" placeholder="1500"/></div>
+      <div class="fr"><label>CV dich.</label><input type="number" id="cHp" placeholder="300"/></div>
+    </div>
+    <div class="fr2">
+      <div class="fr"><label>Trazione</label>
+        <select id="cDrive"><option value="RWD">RWD</option><option value="FWD">FWD</option><option value="AWD">AWD</option></select>
+      </div>
+      <div class="fr"><label>Gomme (es. 225/45R17)</label><input id="cTyre" placeholder="225/45R17"/></div>
+    </div>
+    <div class="ratios-wrap">
+      <div class="ratios-ttl">Rapporti di trasmissione</div>
+      <div class="ratios-hint">Inserisci il rapporto di ogni singola marcia e il rapporto finale (corona/pignone). Lascia vuote le marce assenti.</div>
+      <div class="grrow"><div class="grlbl">Finale</div><input type="number" step="0.001" id="rFinal" placeholder="es. 3.91"/></div>
+      <div id="gearInputs"></div>
+    </div>
+    <button class="btn-save" id="btnSaveCar" onclick="saveCar()">SALVA</button>
+    <button class="btn-cancel-modal" onclick="closeCarForm()">ANNULLA</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ═══════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════
+const CD=0.30, FRONT=2.2, RHO=1.225, ROLL=0.013, G_ACC=9.81, DL=0.15, MAX_G=7;
+
+// ═══════════════════════════════
+// STATE
+// ═══════════════════════════════
+const S={
+  measuring:false, gpsActive:false, watchId:null,
+  speed:0, lastSpeed:0, lastTime:null,
+  altitude:0, lastAlt:0, lastAltTime:null,
+  slopePct:0,           // current slope %
+  points:[], sessionT:null,
+  car:null, gear:null, totalRatio:null, wheelR:null,
+  cars:[], runs:[],
+};
+let editingId=null;
+
+// ═══════════════════════════════
+// DISCLAIMER
+// ═══════════════════════════════
+function onChk(){
+  const ok=document.getElementById('agreeChk').checked;
+  const b=document.getElementById('enterBtn');
+  b.disabled=!ok; b.classList.toggle('ready',ok);
+}
+function enterApp(){
+  document.getElementById('disc').style.display='none';
+  document.getElementById('app').style.display='flex';
+  load(); buildGearInputs(); renderCarList();
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+
+// ═══════════════════════════════
+// TYRE
+// ═══════════════════════════════
+function parseTyre(s){
+  const m=(s||'').trim().toUpperCase().match(/^(\d+)\/(\d+)R(\d+)$/);
+  if(!m) return null;
+  return(+m[3]*25.4+2*(+m[1])*(+m[2]/100))/2/1000; // radius metres
+}
+
+// ═══════════════════════════════
+// PHYSICS  — corrected for slope and proper engine torque
+// ═══════════════════════════════
+// slopePct: road gradient in % (positive = uphill)
+// Returns: { cv, torque_engine_Nm, rpm }
+function calcPower(v_ms, a_ms2, mass_kg, slopePct){
+  const sinθ = slopePct/100; // small-angle: sin≈tan for reasonable slopes
+
+  // Total resistive + inertia force AT THE WHEELS
+  // F_net  = mass × a               (inertia, includes slope effect on measured GPS accel)
+  // Note: GPS acceleration already contains the gravitational component of slope,
+  //       so we must ADD it back to get the actual driving force.
+  // F_grav  = mass × g × sinθ       (gravity component along slope, must be overcome)
+  // F_aero  = ½ρCdA·v²
+  // F_roll  = Crr × mass × g × cosθ ≈ Crr × mass × g  (cosθ≈1 for typical slopes)
+  const F_inertia  = mass_kg * a_ms2;
+  const F_gravity  = mass_kg * G_ACC * sinθ;      // positive = uphill resistance
+  const F_aero     = 0.5 * RHO * CD * FRONT * v_ms * v_ms;
+  const F_roll     = ROLL * mass_kg * G_ACC;
+
+  const F_wheel    = F_inertia + F_gravity + F_aero + F_roll;
+
+  // Power at the wheels
+  const P_wheel    = F_wheel * v_ms;  // Watts
+
+  // Engine power (correct for drivetrain losses)
+  // P_engine = P_wheel / (1 - loss)
+  const P_engine   = P_wheel / (1 - DL);
+  const cv         = Math.max(P_engine / 735.499, 0);
+
+  // Engine torque and RPM from transmission
+  // ω_wheel = v / r_wheel  (rad/s)
+  // ω_engine = ω_wheel × total_ratio
+  // T_engine = P_engine / ω_engine
+  let rpm = null, torque = 0;
+  if(S.totalRatio && S.wheelR && v_ms > 0.5){
+    const omega_wheel  = v_ms / S.wheelR;                     // rad/s at wheel
+    const omega_engine = omega_wheel * S.totalRatio;          // rad/s at engine
+    rpm    = Math.max(omega_engine * 60 / (2*Math.PI), 0);   // RPM
+    // Engine torque from P=T×ω
+    torque = omega_engine > 0 ? Math.max(P_engine / omega_engine, 0) : 0; // Nm
+  } else {
+    // Fallback: wheel torque (no transmission data)
+    torque = Math.max(F_wheel * (S.wheelR || 0.31), 0);
+  }
+
+  return { cv, torque, rpm, P_engine, F_wheel };
+}
+
+// ═══════════════════════════════
+// PERSIST
+// ═══════════════════════════════
+function save(){
+  localStorage.setItem('gd_cars', JSON.stringify(S.cars));
+  localStorage.setItem('gd_runs', JSON.stringify(S.runs));
+}
+function load(){
+  try{
+    S.cars = JSON.parse(localStorage.getItem('gd_cars')||'[]');
+    S.runs = JSON.parse(localStorage.getItem('gd_runs')||'[]');
+  }catch(e){}
+  if(!S.cars.length) seed();
+}
+function seed(){
+  S.cars=[
+    {id:1,make:'VW',model:'Golf GTI',year:2021,mass:1340,drive:'FWD',hp:245,tyre:'225/40R18',finalDrive:3.94,gears:[3.77,2.11,1.36,1.03,0.84,0.67]},
+    {id:2,make:'BMW',model:'330i',year:2022,mass:1540,drive:'RWD',hp:258,tyre:'225/45R17',finalDrive:3.46,gears:[4.17,2.34,1.52,1.14,0.87,0.69,0.58]},
+    {id:3,make:'Fiat',model:'Punto 1.2',year:2008,mass:1020,drive:'FWD',hp:65,tyre:'175/65R14',finalDrive:3.94,gears:[3.58,1.94,1.28,0.97,0.76]},
+    {id:4,make:'Audi',model:'RS6',year:2023,mass:2075,drive:'AWD',hp:600,tyre:'285/40R22',finalDrive:2.77,gears:[5.00,2.86,1.92,1.37,1.00,0.82,0.67]},
+  ]; save();
+}
+
+// ═══════════════════════════════
+// PAGE NAVIGATION
+// ═══════════════════════════════
+function showPage(id, btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('on'));
+  document.getElementById('page-'+id).classList.add('on');
+  if(btn) btn.classList.add('on');
+  if(id==='chart') renderChart();
+  if(id==='cars')  { buildGearInputs(); renderCarList(); }
+  if(id==='runs')  renderRunList();
+}
+function navTo(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('nav button').forEach((b,i)=>{
+    b.classList.remove('on');
+    if(['measure','chart','runs','cars'][i]===id) b.classList.add('on');
+  });
+  document.getElementById('page-'+id).classList.add('on');
+  if(id==='chart') renderChart();
+}
+
+// ═══════════════════════════════
+// GPS
+// ═══════════════════════════════
+function startGPS(){
+  if(!('geolocation' in navigator)){ alert('GPS non disponibile.'); return; }
+  S.watchId = navigator.geolocation.watchPosition(onGPS, onGPSErr, {
+    enableHighAccuracy:true, maximumAge:0, timeout:10000
+  });
+}
+function onGPS(pos){
+  const now  = pos.timestamp;
+  const v    = pos.coords.speed || 0;      // m/s
+  const kmh  = v * 3.6;
+  const alt  = pos.coords.altitude || 0;
+
+  setGPS(S.measuring ? 'rec' : 'ok');
+
+  // ── Acceleration from GPS speed ──
+  let a = 0;
+  if(S.lastTime){
+    const dt = (now - S.lastTime)/1000;
+    if(dt > 0 && dt < 2) a = (v - S.lastSpeed) / dt;
+  }
+  S.speed    = v;
+  S.lastSpeed = v;
+  S.lastTime  = now;
+
+  // ── Slope from altitude ──
+  let slope = S.slopePct; // keep last value if can't compute
+  if(S.lastAltTime && alt != null){
+    const dt2 = (now - S.lastAltTime)/1000;
+    if(dt2 > 0 && dt2 < 5 && v > 1){
+      const dAlt = alt - S.lastAlt;
+      const dDist = v * dt2;            // metres travelled
+      const tanθ = dAlt / dDist;
+      slope = tanθ * 100;               // % gradient
+      // Low-pass filter slope (noisy GPS altitude)
+      S.slopePct = S.slopePct*0.85 + slope*0.15;
+    }
+  }
+  S.lastAlt     = alt;
+  S.lastAltTime = now;
+
+  // ── Update gauges ──
+  document.getElementById('gSpeed').textContent = kmh.toFixed(0);
+  document.getElementById('gAccel').textContent = a.toFixed(2);
+  document.getElementById('sBar').style.width = Math.min(kmh/250*100,100)+'%';
+  document.getElementById('sbarVal').textContent = kmh.toFixed(0)+' km/h';
+
+  // Slope display
+  const sl = S.slopePct;
+  const slEl = document.getElementById('gSlope');
+  slEl.textContent = (sl>=0?'+':'')+sl.toFixed(1);
+  slEl.style.color = Math.abs(sl)<2?'var(--green)':Math.abs(sl)<5?'var(--yellow)':'var(--red)';
+
+  // ── Physics ──
+  if(S.car && a > 0.15){
+    const res = calcPower(v, a, S.car.mass, S.slopePct);
+    document.getElementById('gPower').textContent  = res.cv.toFixed(0);
+    document.getElementById('gTorque').textContent = res.torque.toFixed(0);
+    document.getElementById('gRpm').textContent    = res.rpm!==null ? Math.round(res.rpm).toLocaleString('it') : '—';
+
+    if(S.measuring && kmh>=15 && kmh<=280){
+      S.points.push({
+        speed_kmh:kmh, accel:a,
+        power_cv:res.cv, torque_nm:res.torque,
+        rpm:res.rpm, slope:S.slopePct, t:now
+      });
+    }
+  } else if(!S.car){
+    ['gPower','gTorque','gRpm'].forEach(id=>document.getElementById(id).textContent='—');
+  }
+}
+function onGPSErr(){ setGPS('off'); }
+function setGPS(s){
+  const d=document.getElementById('gpsDot'), l=document.getElementById('gpsLbl');
+  d.className='gps-dot';
+  if(s==='ok')  { d.classList.add('ok');  l.textContent='GPS OK'; }
+  else if(s==='rec'){ d.classList.add('rec'); l.textContent='REC'; }
+  else l.textContent='NO GPS';
+  S.gpsActive = s!=='off';
+}
+
+// ═══════════════════════════════
+// MEASURE CONTROL
+// ═══════════════════════════════
+let recTmr=null;
+function toggleMeasure(){
+  if(!S.car){ alert('Seleziona prima un\'auto nella scheda AUTO.'); return; }
+  if(S.gear===null){ openGearModal(); return; }
+  if(!S.gpsActive){ startGPS(); setTimeout(()=>{ if(!S.gpsActive) alert('In attesa del GPS…'); },3000); return; }
+
+  if(!S.measuring){
+    S.measuring=true; S.points=[]; S.sessionT=Date.now();
+    document.getElementById('mainBtn').textContent='⏹ FERMA MISURA';
+    document.getElementById('mainBtn').className='btn-main stop';
+    document.getElementById('recInd').classList.add('on');
+    recTmr=setInterval(()=>{
+      document.getElementById('recTime').textContent=((Date.now()-S.sessionT)/1000).toFixed(1)+'s';
+    },100);
+    setGPS('rec');
+  } else {
+    stopMeasure();
+  }
+}
+function stopMeasure(){
+  S.measuring=false; clearInterval(recTmr);
+  document.getElementById('mainBtn').textContent='▶ AVVIA MISURA';
+  document.getElementById('mainBtn').className='btn-main start';
+  document.getElementById('recInd').classList.remove('on');
+  setGPS('ok');
+  if(S.points.length>5){ saveRun(); navTo('chart'); }
+  else alert('Dati insufficienti — accelera per almeno 5 secondi.');
+}
+
+// ═══════════════════════════════
+// GEAR SELECTION
+// Direct click = select immediately if ratio known
+// "?" button = open full modal
+// ═══════════════════════════════
+function clickGearBtn(idx){
+  // idx = 0-based index in car.gears array
+  const c = S.car;
+  if(!c) return;
+  if(c.gears && c.gears[idx] !== undefined){
+    const ratio = c.gears[idx];
+    const total = ratio * (c.finalDrive||1);
+    applyGear(idx+1, ratio, total);
+  } else {
+    openGearModal();
+  }
+}
+
+function applyGear(num, ratio, total){
+  S.gear       = num;
+  S.totalRatio = total;
+  document.getElementById('infogear').textContent  = num+'ª marcia';
+  const fd = S.car.finalDrive ? S.car.finalDrive.toFixed(3) : '?';
+  document.getElementById('inforatio').textContent = `${total.toFixed(3)} (${ratio.toFixed(3)}×${fd})`;
+  buildGearRow(); // refresh highlight
+  if(!S.gpsActive) startGPS();
+}
+
+function buildGearRow(){
+  const row = document.getElementById('gearRow');
+  const c   = S.car;
+  if(!c){ row.innerHTML='<span style="font-size:10px;color:var(--muted)">Seleziona un\'auto →</span>'; return; }
+
+  let html = '';
+  if(c.gears && c.gears.length){
+    c.gears.forEach((r,i)=>{
+      const sel = S.gear===i+1 ? ' sel' : '';
+      html += `<button class="gbtn${sel}" onclick="clickGearBtn(${i})">${i+1}</button>`;
+    });
+  }
+  // "?" for unknown ratio / wizard
+  html += `<button class="gbtn unk" onclick="openGearModal()">?</button>`;
+  row.innerHTML = html;
+}
+
+function openGearModal(){
+  const c = S.car; if(!c) return;
+  const fd = c.finalDrive||1, r = S.wheelR;
+  let html = '';
+  (c.gears||[]).forEach((ratio,i)=>{
+    const tot = ratio*fd;
+    let note='';
+    if(r){ const spd=(2000*2*Math.PI/60)/tot*r*3.6; note=` · ${spd.toFixed(0)} km/h @2000rpm`; }
+    html+=`<div class="mg-item${S.gear===i+1?' sel':''}" onclick="selectGearFromModal(${i+1},${ratio},${tot})">
+      <div class="mg-num">${i+1}</div>
+      <div><div class="mg-rv">${ratio.toFixed(3)} × ${fd.toFixed(3)} = ${tot.toFixed(3)}</div>
+      <div class="mg-info">${note}</div></div></div>`;
+  });
+  html+=`<div class="mg-item" onclick="openWizModal()" style="border-color:var(--cyan)">
+    <div class="mg-num" style="color:var(--cyan)">?</div>
+    <div><div class="mg-rv" style="color:var(--cyan)">Non conosco i rapporti</div>
+    <div class="mg-info">Calcola da RPM + velocità</div></div></div>`;
+  document.getElementById('gearList').innerHTML = html;
+  document.getElementById('gearModalSub').textContent = `${c.make} ${c.model} — rapporto finale: ${fd.toFixed(3)}`;
+  document.getElementById('gearOvl').classList.add('open');
+}
+function closeGearModal(){ document.getElementById('gearOvl').classList.remove('open'); }
+function selectGearFromModal(num,ratio,total){
+  closeGearModal(); applyGear(num,ratio,total);
+}
+
+// ═══════════════════════════════
+// WIZARD
+// ═══════════════════════════════
+function openWizModal(){ closeGearModal(); document.getElementById('wizRes').style.display='none'; document.getElementById('wizOvl').classList.add('open'); }
+function closeWizModal(){ document.getElementById('wizOvl').classList.remove('open'); }
+function calcWiz(){
+  const spd=parseFloat(document.getElementById('wSpeed').value);
+  const rpm=parseFloat(document.getElementById('wRpm').value);
+  const gn =parseInt(document.getElementById('wGear').value);
+  if(!spd||!rpm){ alert('Inserisci velocità e RPM.'); return; }
+  if(!S.wheelR){ alert('Nessuna gomma configurata per questa auto.'); return; }
+  const v   = spd/3.6;
+  const oe  = rpm*2*Math.PI/60;
+  const tot = oe * S.wheelR / v;
+  const res = document.getElementById('wizRes');
+  res.style.display='block';
+  res.innerHTML=`<b style="color:var(--green)">✓ Calcolato</b><br/>
+    ${spd} km/h · ${rpm.toLocaleString('it')} RPM → rapporto totale: <b style="color:var(--cyan)">${tot.toFixed(4)}</b><br/>
+    <button class="btn-wiz" style="margin-top:8px" onclick="applyWiz(${gn},${tot})">USA PER LA ${gn}ª MARCIA</button>`;
+}
+function applyWiz(gn,total){
+  S.gear=gn; S.totalRatio=total;
+  closeWizModal(); buildGearRow();
+  document.getElementById('infogear').textContent=gn+'ª (wizard)';
+  document.getElementById('inforatio').textContent=total.toFixed(4)+' (calcolato)';
+  if(!S.gpsActive) startGPS();
+}
+
+// ═══════════════════════════════
+// DATA PROCESSING
+// ═══════════════════════════════
+function smoothPts(pts){
+  if(pts.length<3) return pts;
+  const bins={};
+  for(const p of [...pts].sort((a,b)=>a.speed_kmh-b.speed_kmh)){
+    const k=Math.round(p.speed_kmh/2)*2;
+    if(!bins[k]) bins[k]=[];
+    bins[k].push(p);
+  }
+  const avg=arr=>arr.reduce((s,v)=>s+v,0)/arr.length;
+  return Object.entries(bins).map(([k,ps])=>({
+    speed_kmh:+k,
+    power_cv: avg(ps.map(x=>x.power_cv)),
+    torque_nm:avg(ps.map(x=>x.torque_nm)),
+    rpm: ps[0].rpm!==null ? avg(ps.filter(x=>x.rpm).map(x=>x.rpm)) : null,
+  })).sort((a,b)=>a.speed_kmh-b.speed_kmh);
+}
+function getPeaks(pts){
+  let mp=0,mt=0,mr=0;
+  for(const p of pts){
+    if(p.power_cv>mp){ mp=p.power_cv; mr=p.rpm||0; }
+    if(p.torque_nm>mt) mt=p.torque_nm;
+  }
+  return{power:mp,torque:mt,rpm:mr};
+}
+
+// ═══════════════════════════════
+// RUNS
+// ═══════════════════════════════
+function saveRun(){
+  const sm=smoothPts(S.points), pk=getPeaks(sm);
+  S.runs.unshift({
+    id:Date.now(), date:new Date().toLocaleString('it-IT'),
+    car:S.car, gear:S.gear, totalRatio:S.totalRatio,
+    points:sm, peakPower:pk.power, peakTorque:pk.torque, peakRpm:pk.rpm,
+    duration:(Date.now()-S.sessionT)/1000,
+  });
+  save();
+}
+function renderRunList(){
+  const el=document.getElementById('runList');
+  if(!S.runs.length){ el.innerHTML='<div class="no-data"><div class="no-data-ico">🏁</div><p>Nessuna sessione ancora.</p></div>'; return; }
+  el.innerHTML=S.runs.map((r,i)=>`
+    <div class="run-item" onclick="loadRun(${i})">
+      <div>
+        <div style="font-size:12px;font-weight:600">${r.car.make} ${r.car.model} — ${r.gear?r.gear+'ª':'?'} marcia</div>
+        <div class="run-date">${r.date} · ${r.duration.toFixed(1)}s</div>
+      </div>
+      <div style="text-align:right">
+        <div class="run-peak">${r.peakPower.toFixed(0)} CV</div>
+        <div style="font-size:9px;color:var(--muted)">${r.peakTorque.toFixed(0)} Nm${r.peakRpm?' @'+Math.round(r.peakRpm).toLocaleString('it')+'rpm':''}</div>
+      </div>
+    </div>`).join('');
+}
+function loadRun(i){
+  const r=S.runs[i];
+  S.points=r.points; S.gear=r.gear; S.totalRatio=r.totalRatio;
+  S.car=r.car; S.wheelR=r.car.tyre?parseTyre(r.car.tyre):.31;
+  navTo('chart');
+}
+
+// ═══════════════════════════════
+// CHART
+// ═══════════════════════════════
+function renderChart(){
+  const noData=()=>{
+    document.getElementById('chartSub').textContent='—';
+    document.getElementById('badgePwr').textContent='— CV';
+    document.getElementById('badgeTrq').textContent='— Nm';
+    const canvas=document.getElementById('dynoChart');
+    const ctx=canvas.getContext('2d');
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+  };
+  if(S.points.length<3){ noData(); return; }
+  const sm=S.points, pk=getPeaks(sm);
+  const hasRpm=sm.some(p=>p.rpm&&p.rpm>0);
+  const xk=hasRpm?'rpm':'speed_kmh', xl=hasRpm?'RPM':'km/h';
+  const rpmLbl=pk.rpm?' @ '+Math.round(pk.rpm).toLocaleString('it')+' rpm':'';
+
+  document.getElementById('chartSub').textContent=(S.car?S.car.make+' '+S.car.model:'')+(S.gear?' · '+S.gear+'ª marcia':'');
+  document.getElementById('badgePwr').textContent='⚡ '+pk.power.toFixed(0)+' CV'+rpmLbl;
+  document.getElementById('badgeTrq').textContent='🔩 '+pk.torque.toFixed(0)+' Nm';
+
+  const canvas=document.getElementById('dynoChart');
+  const wrap=canvas.parentElement;
+  const dpr=window.devicePixelRatio||1;
+  const W=wrap.clientWidth, H=wrap.clientHeight;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  const ctx=canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+
+  const pad={t:16,r:52,b:32,l:50};
+  const cW=W-pad.l-pad.r, cH=H-pad.t-pad.b;
+  const pts=hasRpm?sm.filter(p=>p.rpm>0):sm;
+  if(pts.length<2) return;
+
+  const xs=pts.map(p=>p[xk]);
+  const pw=pts.map(p=>p.power_cv);
+  const tq=pts.map(p=>p.torque_nm);
+  const minX=Math.min(...xs), maxX=Math.max(...xs);
+  const maxP=Math.max(...pw)*1.12, maxT=Math.max(...tq)*1.12;
+
+  const xS=x=>pad.l+((x-minX)/(maxX-minX||1))*cW;
+  const yP=v=>pad.t+cH-(v/maxP)*cH;
+  const yT=v=>pad.t+cH-(v/maxT)*cH;
+
+  // bg
+  ctx.fillStyle='#1a1a1a'; ctx.fillRect(0,0,W,H);
+  // grid
+  ctx.strokeStyle='#242424'; ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){ const y=pad.t+(cH/4)*i; ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(W-pad.r,y); ctx.stroke(); }
+
+  // torque fill
+  ctx.beginPath(); ctx.moveTo(xS(xs[0]),yT(tq[0]));
+  pts.forEach((_,i)=>ctx.lineTo(xS(xs[i]),yT(tq[i])));
+  ctx.lineTo(xS(xs[pts.length-1]),pad.t+cH); ctx.lineTo(xS(xs[0]),pad.t+cH); ctx.closePath();
+  ctx.fillStyle='rgba(255,208,0,.07)'; ctx.fill();
+
+  // power fill
+  ctx.beginPath(); ctx.moveTo(xS(xs[0]),yP(pw[0]));
+  pts.forEach((_,i)=>ctx.lineTo(xS(xs[i]),yP(pw[i])));
+  ctx.lineTo(xS(xs[pts.length-1]),pad.t+cH); ctx.lineTo(xS(xs[0]),pad.t+cH); ctx.closePath();
+  const g=ctx.createLinearGradient(0,pad.t,0,pad.t+cH);
+  g.addColorStop(0,'rgba(255,32,32,.3)'); g.addColorStop(1,'rgba(255,32,32,.02)');
+  ctx.fillStyle=g; ctx.fill();
+
+  // torque line
+  ctx.beginPath(); ctx.strokeStyle='#ffd000'; ctx.lineWidth=2; ctx.shadowColor='#ffd000'; ctx.shadowBlur=6;
+  ctx.moveTo(xS(xs[0]),yT(tq[0])); pts.forEach((_,i)=>ctx.lineTo(xS(xs[i]),yT(tq[i]))); ctx.stroke();
+
+  // power line
+  ctx.beginPath(); ctx.strokeStyle='#ff2020'; ctx.lineWidth=2.5; ctx.shadowColor='#ff2020'; ctx.shadowBlur=10;
+  ctx.moveTo(xS(xs[0]),yP(pw[0])); pts.forEach((_,i)=>ctx.lineTo(xS(xs[i]),yP(pw[i]))); ctx.stroke(); ctx.shadowBlur=0;
+
+  // peak dot
+  const pi=pw.indexOf(Math.max(...pw));
+  if(pi>=0){ ctx.beginPath(); ctx.arc(xS(xs[pi]),yP(pw[pi]),5,0,Math.PI*2); ctx.fillStyle='#ff2020'; ctx.shadowColor='#ff2020'; ctx.shadowBlur=14; ctx.fill(); ctx.shadowBlur=0; }
+
+  // labels
+  ctx.fillStyle='#555'; ctx.font=`10px JetBrains Mono,monospace`; ctx.textAlign='center';
+  for(let i=0;i<=4;i++){ const x=minX+((maxX-minX)/4)*i; ctx.fillText(hasRpm?Math.round(x).toLocaleString('it'):x.toFixed(0),xS(x),H-10); }
+  ctx.fillText(xl,pad.l+cW/2,H-1);
+  // power axis (left)
+  ctx.textAlign='right';
+  for(let i=0;i<=4;i++){ const v=(maxP/4)*(4-i); ctx.fillStyle='#aa3333'; ctx.fillText(v.toFixed(0),pad.l-4,yP(v)+4); }
+  // torque axis (right)
+  ctx.textAlign='left';
+  for(let i=0;i<=4;i++){ const v=(maxT/4)*(4-i); ctx.fillStyle='#996600'; ctx.fillText(v.toFixed(0),W-pad.r+4,yT(v)+4); }
+}
+
+// ═══════════════════════════════
+// CARS — edit / delete
+// ═══════════════════════════════
+function renderCarList(){
+  const el=document.getElementById('carList');
+  if(!S.cars.length){ el.innerHTML='<div class="no-data"><div class="no-data-ico">🚗</div><p>Nessuna auto nel database.</p></div>'; return; }
+  el.innerHTML=S.cars.map(c=>`
+    <div class="car-item${S.car&&S.car.id===c.id?' sel':''}" onclick="selectCar(${c.id})">
+      <div style="flex:1">
+        <div class="cname">${c.make} ${c.model} <span style="font-size:9px;color:var(--muted)">(${c.year})</span></div>
+        <div class="cdet">${c.drive}${c.hp?' · '+c.hp+' CV':''}${c.tyre?' · '+c.tyre:''} · ${(c.gears||[]).length} marce · ${c.mass} kg</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">
+        <div class="car-actions">
+          <button class="btn-edit" onclick="event.stopPropagation();openCarForm(${c.id})">✏️</button>
+          <button class="btn-del"  onclick="event.stopPropagation();deleteCar(${c.id})">🗑</button>
+        </div>
+        <div class="cmass">${c.mass}<span class="cmass-u"> kg</span></div>
+      </div>
+    </div>`).join('');
+}
+
+function selectCar(id){
+  S.car=S.cars.find(c=>c.id===id);
+  S.gear=null; S.totalRatio=null;
+  S.wheelR=S.car.tyre ? parseTyre(S.car.tyre) : 0.31;
+  renderCarList();
+  document.getElementById('infocar').textContent=`${S.car.make} ${S.car.model} · ${S.car.mass} kg`;
+  document.getElementById('infogear').textContent='—';
+  document.getElementById('inforatio').textContent='—';
+  buildGearRow();
+  if(!S.gpsActive) startGPS();
+}
+
+function deleteCar(id){
+  const c=S.cars.find(x=>x.id===id);
+  if(!c) return;
+  if(!confirm(`Eliminare ${c.make} ${c.model}?`)) return;
+  S.cars=S.cars.filter(x=>x.id!==id);
+  if(S.car&&S.car.id===id){ S.car=null; S.gear=null; S.totalRatio=null; buildGearRow(); }
+  save(); renderCarList();
+}
+
+function buildGearInputs(){
+  const w=document.getElementById('gearInputs'); if(!w) return; w.innerHTML='';
+  for(let i=1;i<=MAX_G;i++)
+    w.innerHTML+=`<div class="grrow"><div class="grlbl">${i}ª marcia</div><input type="number" step="0.001" id="r${i}" placeholder="${(4.2/i).toFixed(3)}"/></div>`;
+}
+
+// Open form: null = new car, id = edit
+function openCarForm(id){
+  editingId=id;
+  buildGearInputs();
+  if(id){
+    const c=S.cars.find(x=>x.id===id);
+    if(!c) return;
+    document.getElementById('carFormTtl').textContent='✏️ MODIFICA AUTO';
+    document.getElementById('btnSaveCar').textContent='AGGIORNA';
+    document.getElementById('cMake').value=c.make||'';
+    document.getElementById('cModel').value=c.model||'';
+    document.getElementById('cYear').value=c.year||'';
+    document.getElementById('cMass').value=c.mass||'';
+    document.getElementById('cHp').value=c.hp||'';
+    document.getElementById('cDrive').value=c.drive||'RWD';
+    document.getElementById('cTyre').value=c.tyre||'';
+    document.getElementById('rFinal').value=c.finalDrive||'';
+    (c.gears||[]).forEach((v,i)=>{ const el=document.getElementById('r'+(i+1)); if(el) el.value=v; });
+  } else {
+    document.getElementById('carFormTtl').textContent='+ AGGIUNGI AUTO';
+    document.getElementById('btnSaveCar').textContent='SALVA';
+    ['cMake','cModel','cYear','cMass','cHp','cTyre','rFinal'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('cDrive').value='RWD';
+    for(let i=1;i<=MAX_G;i++){ const el=document.getElementById('r'+i); if(el) el.value=''; }
+  }
+  document.getElementById('carFormOvl').classList.add('open');
+}
+function closeCarForm(){ document.getElementById('carFormOvl').classList.remove('open'); editingId=null; }
+
+function saveCar(){
+  const make=document.getElementById('cMake').value.trim();
+  const model=document.getElementById('cModel').value.trim();
+  const year=parseInt(document.getElementById('cYear').value)||new Date().getFullYear();
+  const mass=parseFloat(document.getElementById('cMass').value);
+  const hp=parseInt(document.getElementById('cHp').value)||null;
+  const drive=document.getElementById('cDrive').value;
+  const tyre=document.getElementById('cTyre').value.trim();
+  const fd=parseFloat(document.getElementById('rFinal').value)||null;
+  if(!make||!model||!mass||mass<200){ alert('Compila almeno: Marca, Modello, Massa (min 200 kg)'); return; }
+  if(tyre&&!parseTyre(tyre)){ alert('Formato gomma non valido — usa es. 225/45R17'); return; }
+  const gears=[];
+  for(let i=1;i<=MAX_G;i++){ const v=parseFloat(document.getElementById('r'+i).value); if(v>0) gears.push(v); }
+
+  if(editingId){
+    const idx=S.cars.findIndex(x=>x.id===editingId);
+    if(idx>=0) S.cars[idx]={...S.cars[idx],make,model,year,mass,hp,drive,tyre,finalDrive:fd,gears};
+    // refresh selected car if it was the one edited
+    if(S.car&&S.car.id===editingId){ S.car=S.cars[idx]; S.wheelR=tyre?parseTyre(tyre):.31; buildGearRow(); }
+  } else {
+    S.cars.push({id:Date.now(),make,model,year,mass,hp,drive,tyre,finalDrive:fd,gears});
+  }
+  save(); closeCarForm(); renderCarList();
+}
+
+// ═══════════════════════════════
+// INIT
+// ═══════════════════════════════
+// Resize observer for chart
+const chartObs = new ResizeObserver(()=>{ if(S.points.length>2) renderChart(); });
+chartObs.observe(document.querySelector('.chart-wrap'));
+</script>
+</body>
+</html>
