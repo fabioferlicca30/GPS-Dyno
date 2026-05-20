@@ -280,6 +280,13 @@ input:focus,select:focus{border-color:var(--cyan)}
 ::-webkit-scrollbar-track{background:var(--bg)}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 
+/* ── 3 BIG LIVE GAUGES ── */
+.g3-live{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;flex-shrink:0}
+.live-big{padding:14px 10px}
+.live-big .glbl{font-size:9px;letter-spacing:2px}
+.live-big .gval{font-size:clamp(30px,7vw,56px);font-weight:900}
+.live-big .gunit{font-size:11px;margin-top:4px}
+
 /* ══ LANDSCAPE ══ */
 @media (orientation:landscape){
   #app{flex-direction:row}
@@ -297,9 +304,10 @@ input:focus,select:focus{border-color:var(--cyan)}
   #page-measure{flex-direction:row;padding:8px;gap:8px}
   #measure-left{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
   #measure-right{display:flex;flex-direction:column;gap:6px;width:190px;flex-shrink:0}
-  .g4-land{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:6px;flex:1;min-height:0}
-  .g2-land{display:grid;grid-template-columns:1fr 1fr;gap:6px;flex-shrink:0}
-  .gval{font-size:clamp(16px,3.2vw,30px)}
+  /* 3 live gauges: stack vertically in landscape, fill left column */
+  .g3-live{grid-template-columns:1fr;flex:1;min-height:0;gap:6px}
+  .live-big{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center}
+  .live-big .gval{font-size:clamp(22px,5vh,46px)}
   .btn-main{font-size:10px;padding:0;flex:1;min-height:44px}
   .ibox{font-size:9px;line-height:1.5;padding:7px 9px}
   .gear-panel{padding:7px}
@@ -385,23 +393,33 @@ input:focus,select:focus{border-color:var(--cyan)}
 
       <!-- LEFT column (portrait: full width; landscape: flex:1) -->
       <div id="measure-left">
-        <!-- 4 gauges: portrait=grid-4, landscape=2×2 via g4-land -->
-        <div class="g4 g4-land">
-          <div class="gcard gc"><div class="glbl">VELOCITÀ</div><div class="gval" id="gSpeed">0</div><div class="gunit">km/h</div></div>
-          <div class="gcard go"><div class="glbl">ACCEL.</div><div class="gval" id="gAccel">0.00</div><div class="gunit">m/s²</div></div>
-          <div class="gcard gr"><div class="glbl">POTENZA</div><div class="gval" id="gPower">—</div><div class="gunit">CV</div></div>
-          <div class="gcard gy"><div class="glbl">COPPIA</div><div class="gval" id="gTorque">—</div><div class="gunit">Nm</div></div>
-        </div>
-        <!-- 2 gauges: RPM + slope -->
-        <div class="g2 g2-land">
-          <div class="gcard gg"><div class="glbl">RPM STIM.</div><div class="gval" id="gRpm">—</div><div class="gunit">giri/min</div></div>
-          <div class="gcard gm"><div class="glbl">PENDENZA</div><div class="gval" id="gSlope">0.0</div><div class="gunit">%</div></div>
+        <!-- 3 BIG live gauges: velocità · potenza · pendenza -->
+        <div class="g3-live">
+          <div class="gcard gc live-big">
+            <div class="glbl">VELOCITÀ</div>
+            <div class="gval" id="gSpeed">0</div>
+            <div class="gunit">km/h</div>
+          </div>
+          <div class="gcard gr live-big">
+            <div class="glbl">POTENZA LIVE</div>
+            <div class="gval" id="gPower">—</div>
+            <div class="gunit">CV</div>
+          </div>
+          <div class="gcard gm live-big">
+            <div class="glbl">PENDENZA</div>
+            <div class="gval" id="gSlope">0.0</div>
+            <div class="gunit">%</div>
+          </div>
         </div>
         <!-- Speed bar -->
         <div class="sbar">
           <div class="sbar-hdr"><span>0</span><span id="sbarVal">0 km/h</span><span>250</span></div>
           <div class="sbar-track"><div class="sbar-fill" id="sBar"></div></div>
         </div>
+        <!-- hidden inputs kept for JS compatibility -->
+        <span id="gAccel" style="display:none">0</span>
+        <span id="gTorque" style="display:none">0</span>
+        <span id="gRpm" style="display:none">0</span>
       </div>
 
       <!-- RIGHT column (portrait: full width; landscape: 190px fixed) -->
@@ -519,6 +537,16 @@ input:focus,select:focus{border-color:var(--cyan)}
       </div>
       <div class="fr"><label>Gomme (es. 225/45R17)</label><input id="cTyre" placeholder="225/45R17"/></div>
     </div>
+    <div class="fr2">
+      <div class="fr">
+        <label>Cx aerodinamico <span style="color:var(--muted);font-size:8px">(opzionale, default 0.30)</span></label>
+        <input type="number" step="0.01" id="cCx" placeholder="es. 0.28" min="0.1" max="1.5"/>
+      </div>
+      <div class="fr">
+        <label>Area frontale m² <span style="color:var(--muted);font-size:8px">(opzionale, default 2.20)</span></label>
+        <input type="number" step="0.05" id="cFront" placeholder="es. 2.10" min="0.5" max="6"/>
+      </div>
+    </div>
     <div class="ratios-wrap">
       <div class="ratios-ttl">Rapporti di trasmissione</div>
       <div class="ratios-hint">Inserisci il rapporto di ogni singola marcia e il rapporto finale (corona/pignone). Lascia vuote le marce assenti.</div>
@@ -580,7 +608,7 @@ function parseTyre(s){
 // ═══════════════════════════════
 // slopePct: road gradient in % (positive = uphill)
 // Returns: { cv, torque_engine_Nm, rpm }
-function calcPower(v_ms, a_ms2, mass_kg, slopePct){
+function calcPower(v_ms, a_ms2, mass_kg, slopePct, car_cx, car_front){
   const sinθ = slopePct/100; // small-angle: sin≈tan for reasonable slopes
 
   // Total resistive + inertia force AT THE WHEELS
@@ -592,7 +620,8 @@ function calcPower(v_ms, a_ms2, mass_kg, slopePct){
   // F_roll  = Crr × mass × g × cosθ ≈ Crr × mass × g  (cosθ≈1 for typical slopes)
   const F_inertia  = mass_kg * a_ms2;
   const F_gravity  = mass_kg * G_ACC * sinθ;      // positive = uphill resistance
-  const F_aero     = 0.5 * RHO * CD * FRONT * v_ms * v_ms;
+  const _cx=car_cx||CD, _front=car_front||FRONT;
+  const F_aero     = 0.5 * RHO * _cx * _front * v_ms * v_ms;
   const F_roll     = ROLL * mass_kg * G_ACC;
 
   const F_wheel    = F_inertia + F_gravity + F_aero + F_roll;
@@ -652,9 +681,14 @@ function seed(){
 // ═══════════════════════════════
 function showPage(id, btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
-  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('on'));
+  // sync all nav buttons (portrait nav + sidebar)
+  document.querySelectorAll('nav button, #sidebar .s-nav button').forEach(b=>b.classList.remove('on'));
   document.getElementById('page-'+id).classList.add('on');
   if(btn) btn.classList.add('on');
+  // also activate matching sidebar button
+  const sideId='snav-'+id;
+  const sideBtn=document.getElementById(sideId);
+  if(sideBtn) sideBtn.classList.add('on');
   if(id==='chart') renderChart();
   if(id==='cars')  { buildGearInputs(); renderCarList(); }
   if(id==='runs')  renderRunList();
@@ -712,9 +746,8 @@ function onGPS(pos){
   S.lastAlt     = alt;
   S.lastAltTime = now;
 
-  // ── Update gauges ──
+  // ── Update live gauges: always show speed + slope ──
   document.getElementById('gSpeed').textContent = kmh.toFixed(0);
-  document.getElementById('gAccel').textContent = a.toFixed(2);
   document.getElementById('sBar').style.width = Math.min(kmh/250*100,100)+'%';
   document.getElementById('sbarVal').textContent = kmh.toFixed(0)+' km/h';
 
@@ -724,12 +757,37 @@ function onGPS(pos){
   slEl.textContent = (sl>=0?'+':'')+sl.toFixed(1);
   slEl.style.color = Math.abs(sl)<2?'var(--green)':Math.abs(sl)<5?'var(--yellow)':'var(--red)';
 
-  // ── Physics ──
+  // ── Live power: works as long as we have mass (car selected) ──
+  // Does NOT require gear/ratio — P = F×v directly from GPS
+  const pwrEl = document.getElementById('gPower');
+  if(S.car && v > 0.5){
+    if(a > 0.1){
+      // Full calculation with slope correction
+      const _cx=S.car.cx||CD, _front=S.car.front||FRONT;
+      const Fw = S.car.mass*a
+                + 0.5*RHO*_cx*_front*v*v
+                + ROLL*S.car.mass*G_ACC
+                + S.car.mass*G_ACC*(S.slopePct/100);
+      const cv = Math.max(Fw*v/(1-DL)/735.499, 0);
+      pwrEl.textContent = cv.toFixed(0);
+      pwrEl.style.color = '';  // use card accent color
+    } else {
+      // Not accelerating — show 0 instead of stale value
+      pwrEl.textContent = '0';
+      pwrEl.style.color = 'var(--muted)';
+    }
+  } else {
+    pwrEl.textContent = S.car ? '0' : '—';
+    pwrEl.style.color = 'var(--muted)';
+  }
+
+  // ── Physics for recording (needs car) ──
   if(S.car && a > 0.15){
-    const res = calcPower(v, a, S.car.mass, S.slopePct);
-    document.getElementById('gPower').textContent  = res.cv.toFixed(0);
+    const res = calcPower(v, a, S.car.mass, S.slopePct, S.car.cx, S.car.front);
+    // keep hidden spans updated for JS compat
+    document.getElementById('gAccel').textContent  = a.toFixed(2);
     document.getElementById('gTorque').textContent = res.torque.toFixed(0);
-    document.getElementById('gRpm').textContent    = res.rpm!==null ? Math.round(res.rpm).toLocaleString('it') : '—';
+    document.getElementById('gRpm').textContent    = res.rpm!==null ? Math.round(res.rpm) : 0;
 
     if(S.measuring && kmh>=15 && kmh<=280){
       S.points.push({
@@ -738,17 +796,21 @@ function onGPS(pos){
         rpm:res.rpm, slope:S.slopePct, t:now
       });
     }
-  } else if(!S.car){
-    ['gPower','gTorque','gRpm'].forEach(id=>document.getElementById(id).textContent='—');
   }
 }
 function onGPSErr(){ setGPS('off'); }
 function setGPS(s){
-  const d=document.getElementById('gpsDot'), l=document.getElementById('gpsLbl');
-  d.className='gps-dot';
-  if(s==='ok')  { d.classList.add('ok');  l.textContent='GPS OK'; }
-  else if(s==='rec'){ d.classList.add('rec'); l.textContent='REC'; }
-  else l.textContent='NO GPS';
+  // update both portrait and sidebar indicators
+  ['gpsDot','gpsDotS'].forEach(id=>{
+    const d=document.getElementById(id); if(!d) return;
+    d.className='gps-dot';
+    if(s==='ok') d.classList.add('ok');
+    else if(s==='rec') d.classList.add('rec');
+  });
+  const lbl=document.getElementById('gpsLbl'), lblS=document.getElementById('gpsLblS');
+  const txt = s==='ok'?'GPS OK':s==='rec'?'REC':'NO GPS';
+  if(lbl) lbl.textContent=txt;
+  if(lblS) lblS.textContent=s==='ok'?'OK':s==='rec'?'●':'—';
   S.gpsActive = s!=='off';
 }
 
@@ -1101,12 +1163,14 @@ function openCarForm(id){
     document.getElementById('cHp').value=c.hp||'';
     document.getElementById('cDrive').value=c.drive||'RWD';
     document.getElementById('cTyre').value=c.tyre||'';
+    document.getElementById('cCx').value=c.cx||'';
+    document.getElementById('cFront').value=c.front||'';
     document.getElementById('rFinal').value=c.finalDrive||'';
     (c.gears||[]).forEach((v,i)=>{ const el=document.getElementById('r'+(i+1)); if(el) el.value=v; });
   } else {
     document.getElementById('carFormTtl').textContent='+ AGGIUNGI AUTO';
     document.getElementById('btnSaveCar').textContent='SALVA';
-    ['cMake','cModel','cYear','cMass','cHp','cTyre','rFinal'].forEach(id=>document.getElementById(id).value='');
+    ['cMake','cModel','cYear','cMass','cHp','cTyre','cCx','cFront','rFinal'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('cDrive').value='RWD';
     for(let i=1;i<=MAX_G;i++){ const el=document.getElementById('r'+i); if(el) el.value=''; }
   }
@@ -1122,6 +1186,8 @@ function saveCar(){
   const hp=parseInt(document.getElementById('cHp').value)||null;
   const drive=document.getElementById('cDrive').value;
   const tyre=document.getElementById('cTyre').value.trim();
+  const cx=parseFloat(document.getElementById('cCx').value)||null;
+  const front=parseFloat(document.getElementById('cFront').value)||null;
   const fd=parseFloat(document.getElementById('rFinal').value)||null;
   if(!make||!model||!mass||mass<200){ alert('Compila almeno: Marca, Modello, Massa (min 200 kg)'); return; }
   if(tyre&&!parseTyre(tyre)){ alert('Formato gomma non valido — usa es. 225/45R17'); return; }
@@ -1130,14 +1196,30 @@ function saveCar(){
 
   if(editingId){
     const idx=S.cars.findIndex(x=>x.id===editingId);
-    if(idx>=0) S.cars[idx]={...S.cars[idx],make,model,year,mass,hp,drive,tyre,finalDrive:fd,gears};
+    if(idx>=0) S.cars[idx]={...S.cars[idx],make,model,year,mass,hp,drive,tyre,cx,front,finalDrive:fd,gears};
     // refresh selected car if it was the one edited
     if(S.car&&S.car.id===editingId){ S.car=S.cars[idx]; S.wheelR=tyre?parseTyre(tyre):.31; buildGearRow(); }
   } else {
-    S.cars.push({id:Date.now(),make,model,year,mass,hp,drive,tyre,finalDrive:fd,gears});
+    S.cars.push({id:Date.now(),make,model,year,mass,hp,drive,tyre,cx,front,finalDrive:fd,gears});
   }
   save(); closeCarForm(); renderCarList();
 }
+
+// ═══════════════════════════════
+// ORIENTATION — show/hide sidebar
+// ═══════════════════════════════
+function applyOrientation(){
+  const land = window.innerWidth > window.innerHeight;
+  const sidebar = document.getElementById('sidebar');
+  if(sidebar) sidebar.style.display = land ? 'flex' : 'none';
+  // re-render chart if visible (canvas size changed)
+  if(S.points.length>2){
+    const cp = document.getElementById('page-chart');
+    if(cp && cp.classList.contains('on')) renderChart();
+  }
+}
+window.addEventListener('resize', applyOrientation);
+window.addEventListener('orientationchange', ()=>setTimeout(applyOrientation, 150));
 
 // ═══════════════════════════════
 // INIT
